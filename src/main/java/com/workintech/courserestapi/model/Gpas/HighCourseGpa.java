@@ -1,5 +1,8 @@
 package com.workintech.courserestapi.model.Gpas;
 
+import org.springframework.stereotype.Component;
+
+@Component
 public class HighCourseGpa implements CourseGpa{
 
     @Override

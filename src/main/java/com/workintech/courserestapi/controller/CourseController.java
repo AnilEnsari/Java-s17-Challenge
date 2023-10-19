@@ -1,42 +1,45 @@
 package com.workintech.courserestapi.controller;
 
 import com.workintech.courserestapi.model.Course;
+import com.workintech.courserestapi.model.CourseResponse;
 import com.workintech.courserestapi.model.Gpas.CourseGpa;
 import com.workintech.courserestapi.model.Gpas.HighCourseGpa;
 import com.workintech.courserestapi.model.Gpas.LowCourseGpa;
 import com.workintech.courserestapi.model.Gpas.MediumCourseGpa;
+import com.workintech.courserestapi.exceptions.CourseException;
+import com.workintech.courserestapi.exceptions.CourseValidation;
 import jakarta.annotation.PostConstruct;
-import lombok.AllArgsConstructor;
-import lombok.Data;
-import lombok.NoArgsConstructor;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Qualifier;
+import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.ArrayList;
-import java.util.HashMap;
 import java.util.List;
-import java.util.Map;
 
 @RestController
 @RequestMapping("/courses")
-@NoArgsConstructor
-@AllArgsConstructor
-@Data
+
 public class CourseController {
 
     private List<Course> courses;
-    private CourseGpa courseGpa;
-  private   Map<String, Integer> courseAndGpa;
+    private CourseGpa lowCourseGpa;
+    private CourseGpa mediumCourseGpa;
+    private CourseGpa highCourseGpa;
+
 
     @PostConstruct
     public void init() {
         courses = new ArrayList<>();
-        courseAndGpa = new HashMap<>();
     }
 
     @Autowired
-    public void gpaController(CourseGpa courseGpa) {
-        this.courseGpa = courseGpa;
+    public void gpaController(@Qualifier("lowCourseGpa") CourseGpa lowCourseGpa,
+                              @Qualifier("mediumCourseGpa") CourseGpa mediumCourseGpa,
+                              @Qualifier("highCourseGpa") CourseGpa highCourseGpa) {
+        this.lowCourseGpa = lowCourseGpa;
+        this.mediumCourseGpa = mediumCourseGpa;
+        this.highCourseGpa = highCourseGpa;
     }
 
     @GetMapping("/")
@@ -45,32 +48,81 @@ public class CourseController {
     }
 
     @GetMapping("/{name}")
-    // TODO [Anil] eğer name içeren course yoksa hata ver
-    public Course find(String name) {
+    public Course find(@PathVariable String name) {
+        CourseValidation.isCourseEmpty(courses);
+
         for (Course course : courses) {
-            if (course.getName().equals(name)) {
+            if (course.getName().equalsIgnoreCase(name)) {
                 return course;
             }
         }
-        return null;
+        throw new CourseException("There is no course with the given name: " + name, HttpStatus.NOT_FOUND);
+
     }
 
     @PostMapping("/")
-    public Map<String, Integer> save(@RequestBody Course course) {
-        // TODO [Anil] course.get 0 ve 4 arasında integer olmak zorunda
-
-        int totalGpa = 0;
+    public CourseResponse save(@RequestBody Course course) {
+        CourseValidation.isCreditValid(course);
+        CourseValidation.isCourseAddedBefore(courses, course);
+        double totalGpa = 0;
         if (course.getCredit() <= 2) {
-            courseGpa = new LowCourseGpa();
+            totalGpa = course.getGrade().getCoefficient() * course.getCredit() * ((LowCourseGpa) lowCourseGpa).getGpa();
+            courses.add(course);
+
         } else if (course.getCredit() == 3) {
-            courseGpa = new MediumCourseGpa();
+            totalGpa = course.getGrade().getCoefficient() * course.getCredit() * ((MediumCourseGpa) mediumCourseGpa).getGpa();
+            courses.add(course);
         } else if (course.getCredit() == 4) {
-            courseGpa = new HighCourseGpa();
+            totalGpa = course.getGrade().getCoefficient() * course.getCredit() * ((HighCourseGpa) highCourseGpa).getGpa();
+            courses.add(course);
         }
 
-        totalGpa = course.getGrade().getCoefficient() * course.getCredit() * courseGpa.getGpa();
-       courses.add(course);
-        courseAndGpa.put(course.getName(),totalGpa);
-        return courseAndGpa ;
+        courses.add(course);
+        return new CourseResponse(course, totalGpa);
+    }
+
+    @PutMapping("/{name}")
+    public CourseResponse update(@PathVariable String name, @RequestBody Course course) {
+        CourseValidation.isCreditValid(course);
+
+        double totalGpa = 0;
+        if (course.getCredit() <= 2) {
+            totalGpa = course.getGrade().getCoefficient() * course.getCredit() * ((LowCourseGpa) lowCourseGpa).getGpa();
+
+        } else if (course.getCredit() == 3) {
+            totalGpa = course.getGrade().getCoefficient() * course.getCredit() * ((MediumCourseGpa) mediumCourseGpa).getGpa();
+
+        } else if (course.getCredit() == 4) {
+            totalGpa = course.getGrade().getCoefficient() * course.getCredit() * ((HighCourseGpa) highCourseGpa).getGpa();
+        }
+        for (Course searchedCourse : courses) {
+            if (searchedCourse.getName().equals(name)) {
+                searchedCourse.setCredit(course.getCredit());
+                searchedCourse.setGrade(course.getGrade());
+                return new CourseResponse(course, totalGpa);
+            }
+
+        }
+
+        throw new CourseException("There is no course with the given name: " + name, HttpStatus.NOT_FOUND);
+    }
+
+    @DeleteMapping("/{name}")
+    public Course delete(@PathVariable String name) {
+
+        CourseValidation.isCourseEmpty(courses);
+
+
+        for (Course searchedCourse : courses) {
+            if (searchedCourse.getName().equals(name)) {
+                Course deletedCourse = new Course(searchedCourse.getName(), searchedCourse.getCredit(), searchedCourse.getGrade());
+
+                courses.remove(searchedCourse);
+                return deletedCourse;
+            }
+
+        }
+
+        throw new CourseException("The course you want to is not in the list " + name, HttpStatus.NOT_FOUND);
     }
 }
