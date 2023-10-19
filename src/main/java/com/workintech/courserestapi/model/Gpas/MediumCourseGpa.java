@@ -1,4 +1,4 @@
-package model.Gpas;
+package com.workintech.courserestapi.model.Gpas;
 
 public class MediumCourseGpa implements CourseGpa{
     @Override

@@ -1,4 +1,4 @@
-package model;
+package com.workintech.courserestapi.model;
 
 
 import lombok.AllArgsConstructor;
@@ -10,7 +10,7 @@ import lombok.NoArgsConstructor;
 @AllArgsConstructor
 public class Course {
     //String name, int credit, Grade grade isimli 2 fielda sahip olmalı.
-    String name ;
-    int credit ;
-    Grade grade;
+   private String name ;
+   private int credit ;
+  private   Grade grade;
 }
